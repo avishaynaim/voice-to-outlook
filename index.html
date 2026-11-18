@@ -190,7 +190,7 @@ function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(
 
 async function loadList() {
   if (!cfg.token || !cfg.gistId) return;
-  try { renderList((await gistGet()).items); } catch (_) {}
+  try { renderList((await gistGet()).items); } catch (e) { showMsg(e.message, false); }
 }
 
 setLang(lang);
