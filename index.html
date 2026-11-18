@@ -183,7 +183,7 @@ function renderList(items) {
   $('list').innerHTML = (items || []).map(i =>
     '<div class="item"><div class="txt" dir="auto">' + esc(i.text) + '</div>' +
     '<div class="meta"><span>' + new Date(i.ts).toLocaleString() + '</span>' +
-    '<button class="del" onclick="delItem(' + i.id + ')">Delete</button></div></div>'
+    '<button class="del" onclick="delItem(' + Number(i.id) + ')">Delete</button></div></div>'
   ).join('') || '<div style="color:#999;font-size:13px">No transcripts yet</div>';
 }
 function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
