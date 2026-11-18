@@ -140,7 +140,10 @@ async function gistGet() {
   });
   if (!r.ok) throw new Error('Read failed (' + r.status + ')');
   const g = await r.json();
-  try { return JSON.parse(g.files['transcripts.json'].content); } catch (_) { return { items: [] }; }
+  const f = g.files && g.files['transcripts.json'];
+  if (!f) return { items: [] };
+  if (f.truncated) throw new Error('Read failed (transcripts truncated)');
+  try { return JSON.parse(f.content); } catch (_) { throw new Error('Read failed (stored transcripts unreadable; not overwriting)'); }
 }
 async function gistSave(data) {
   const r = await fetch('https://api.github.com/gists/' + cfg.gistId, {
