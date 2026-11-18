@@ -73,7 +73,7 @@
 const $ = id => document.getElementById(id);
 let cfg = JSON.parse(localStorage.getItem('v2o-cfg') || '{}');
 let lang = localStorage.getItem('v2o-lang') || 'he-IL';
-let recording = false, rec = null, finalText = '';
+let recording = false, rec = null, finalText = '', restartFails = 0;
 
 function toggleSettings() {
   const s = $('settings');
@@ -92,7 +92,7 @@ function setLang(l) {
   lang = l; localStorage.setItem('v2o-lang', l);
   $('langHe').classList.toggle('active', l === 'he-IL');
   $('langEn').classList.toggle('active', l === 'en-US');
-  if (recording) { stopRec(); }
+  if (recording) { stopRec(); startRec(); }  // restart so the session isn't silently dropped
 }
 function showMsg(t, ok) { $('msg').textContent = t; $('msg').className = ok ? 'ok' : 'err'; setTimeout(() => $('msg').textContent = '', 4000); }
 
@@ -106,7 +106,9 @@ function startRec() {
   rec.lang = lang;
   rec.continuous = true;
   rec.interimResults = true;
+  restartFails = 0;
   rec.onresult = e => {
+    restartFails = 0;
     let interim = '';
     for (let i = e.resultIndex; i < e.results.length; i++) {
       if (e.results[i].isFinal) finalText += e.results[i][0].transcript + ' ';
@@ -116,9 +118,19 @@ function startRec() {
   };
   rec.onerror = e => {
     if (e.error === 'not-allowed') { showMsg('Microphone permission denied', false); stopRec(); }
+    else if (e.error === 'service-not-allowed' || e.error === 'network' || e.error === 'language-not-supported' || e.error === 'audio-capture') { showMsg('Recording stopped: ' + e.error, false); stopRec(); }
     else if (e.error !== 'no-speech' && e.error !== 'aborted') showMsg('Error: ' + e.error, false);
   };
-  rec.onend = () => { if (recording) try { rec.start(); } catch (_) {} };  // auto-restart (Android stops often)
+  // auto-restart (Android stops often), with backoff and a cap on consecutive failed restarts
+  rec.onend = () => {
+    if (!recording) return;
+    if (++restartFails > 5) { showMsg('Recording stopped: speech recognition keeps ending', false); stopRec(); return; }
+    const r = rec;
+    setTimeout(() => {
+      if (!recording || rec !== r) return;
+      try { r.start(); } catch (_) { showMsg('Recording stopped: could not restart', false); stopRec(); }
+    }, Math.min(250 * restartFails, 1500));
+  };
   try { rec.start(); } catch (_) {}
   recording = true;
   $('recBtn').classList.add('recording');
