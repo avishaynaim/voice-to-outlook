@@ -69,33 +69,17 @@
 <h2>Recent transcripts</h2>
 <div id="list"></div>
 
+<script src="common.js"></script>
 <script>
-const $ = id => document.getElementById(id);
-let cfg = JSON.parse(localStorage.getItem('v2o-cfg') || '{}');
 let lang = localStorage.getItem('v2o-lang') || 'he-IL';
 let recording = false, rec = null, finalText = '', restartFails = 0;
 
-function toggleSettings() {
-  const s = $('settings');
-  s.style.display = s.style.display === 'block' ? 'none' : 'block';
-  $('token').value = cfg.token || '';
-  $('gistId').value = cfg.gistId || '';
-}
-function saveSettings() {
-  cfg = { token: $('token').value.trim(), gistId: $('gistId').value.trim() };
-  localStorage.setItem('v2o-cfg', JSON.stringify(cfg));
-  $('settings').style.display = 'none';
-  showMsg('Settings saved', true);
-  loadList();
-}
 function setLang(l) {
   lang = l; localStorage.setItem('v2o-lang', l);
   $('langHe').classList.toggle('active', l === 'he-IL');
   $('langEn').classList.toggle('active', l === 'en-US');
   if (recording) { stopRec(); startRec(); }  // restart so the session isn't silently dropped
 }
-function showMsg(t, ok) { $('msg').textContent = t; $('msg').className = ok ? 'ok' : 'err'; setTimeout(() => $('msg').textContent = '', 4000); }
-
 function toggleRec() { recording ? stopRec() : startRec(); }
 
 function startRec() {
@@ -146,26 +130,6 @@ function stopRec() {
 }
 function clearText() { $('transcript').value = ''; finalText = ''; }
 
-async function gistGet() {
-  const r = await fetch('https://api.github.com/gists/' + cfg.gistId, {
-    headers: { 'Authorization': 'Bearer ' + cfg.token, 'Accept': 'application/vnd.github+json' }
-  });
-  if (!r.ok) throw new Error('Read failed (' + r.status + ')');
-  const g = await r.json();
-  const f = g.files && g.files['transcripts.json'];
-  if (!f) return { items: [] };
-  if (f.truncated) throw new Error('Read failed (transcripts truncated)');
-  try { return JSON.parse(f.content); } catch (_) { throw new Error('Read failed (stored transcripts unreadable; not overwriting)'); }
-}
-async function gistSave(data) {
-  const r = await fetch('https://api.github.com/gists/' + cfg.gistId, {
-    method: 'PATCH',
-    headers: { 'Authorization': 'Bearer ' + cfg.token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ files: { 'transcripts.json': { content: JSON.stringify(data, null, 1) } } })
-  });
-  if (!r.ok) throw new Error('Save failed (' + r.status + ')');
-}
-
 async function send() {
   const text = $('transcript').value.trim();
   if (!text) { showMsg('Nothing to send', false); return; }
@@ -198,8 +162,6 @@ function renderList(items) {
     '<button class="del" onclick="delItem(' + Number(i.id) + ')">Delete</button></div></div>'
   ).join('') || '<div style="color:#999;font-size:13px">No transcripts yet</div>';
 }
-function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-
 async function loadList() {
   if (!cfg.token || !cfg.gistId) return;
   try { renderList((await gistGet()).items); } catch (e) { showMsg(e.message, false); }
