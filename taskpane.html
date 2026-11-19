@@ -75,19 +75,24 @@ async function loadList() {
 }
 
 function render() {
-  $('list').innerHTML = items.map((i, idx) =>
-    '<div class="item"><div class="txt" dir="auto">' + esc(i.text) + '</div>' +
-    '<div class="meta">' + new Date(i.ts).toLocaleString() + '</div>' +
+  items = items.filter(i => i && typeof i === 'object');
+  $('list').innerHTML = items.map(i => {
+    const d = new Date(i.ts);
+    return '<div class="item"><div class="txt" dir="auto">' + esc(String(i.text == null ? '' : i.text)) + '</div>' +
+    '<div class="meta">' + (isNaN(d) ? '' : d.toLocaleString()) + '</div>' +
     '<div class="row">' +
-    '<button class="btn btn-blue btn-sm" onclick="insert(' + idx + ')">Insert</button>' +
-    '<button class="btn btn-sm del" onclick="delItem(' + idx + ')">Delete</button>' +
-    '</div></div>'
-  ).join('') || '<div id="empty">No transcripts yet.<br>Record on your phone, then hit 🔄</div>';
+    '<button class="btn btn-blue btn-sm ins">Insert</button>' +
+    '<button class="btn btn-sm del">Delete</button>' +
+    '</div></div>';
+  }).join('') || '<div id="empty">No transcripts yet.<br>Record on your phone, then hit 🔄</div>';
+  const list = $('list');
+  list.querySelectorAll('button.ins').forEach((b, n) => b.addEventListener('click', () => insert(items[n])));
+  list.querySelectorAll('button.del').forEach((b, n) => b.addEventListener('click', () => delItem(items[n].id)));
 }
 
-function insert(idx) {
+function insert(item) {
   Office.context.mailbox.item.body.setSelectedDataAsync(
-    items[idx].text,
+    String(item.text == null ? '' : item.text),
     { coercionType: Office.CoercionType.Text },
     res => {
       if (res.status === Office.AsyncResultStatus.Succeeded) showMsg('✓ Inserted', true);
@@ -96,10 +101,10 @@ function insert(idx) {
   );
 }
 
-async function delItem(idx) {
+async function delItem(id) {
   try {
     const data = await gistGet();
-    data.items = (data.items || []).filter(i => i.id !== items[idx].id);
+    data.items = (data.items || []).filter(i => !i || i.id !== id);
     await gistSave(data);
     items = data.items;
     render();

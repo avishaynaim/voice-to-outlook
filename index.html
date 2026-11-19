@@ -138,7 +138,7 @@ async function send() {
   showMsg('Sending...', true);
   try {
     const data = await gistGet();
-    data.items = [{ id: Date.now(), text, lang, ts: new Date().toISOString() }, ...(data.items || [])].slice(0, 20);
+    data.items = [{ id: (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2)), text, lang, ts: new Date().toISOString() }, ...(data.items || [])].slice(0, 20);
     await gistSave(data);
     clearText();
     showMsg('✓ Sent! Open the Voice Text panel in Outlook', true);
@@ -149,18 +149,23 @@ async function send() {
 async function delItem(id) {
   try {
     const data = await gistGet();
-    data.items = (data.items || []).filter(i => i.id !== id);
+    data.items = (data.items || []).filter(i => !i || i.id !== id);
     await gistSave(data);
     renderList(data.items);
   } catch (e) { showMsg(e.message, false); }
 }
 
 function renderList(items) {
-  $('list').innerHTML = (items || []).map(i =>
-    '<div class="item"><div class="txt" dir="auto">' + esc(i.text) + '</div>' +
-    '<div class="meta"><span>' + new Date(i.ts).toLocaleString() + '</span>' +
-    '<button class="del" onclick="delItem(' + Number(i.id) + ')">Delete</button></div></div>'
-  ).join('') || '<div style="color:#999;font-size:13px">No transcripts yet</div>';
+  items = (items || []).filter(i => i && typeof i === 'object');
+  $('list').innerHTML = items.map(i => {
+    const d = new Date(i.ts);
+    return '<div class="item"><div class="txt" dir="auto">' + esc(String(i.text == null ? '' : i.text)) + '</div>' +
+    '<div class="meta"><span>' + (isNaN(d) ? '' : d.toLocaleString()) + '</span>' +
+    '<button class="del">Delete</button></div></div>';
+  }).join('') || '<div style="color:#999;font-size:13px">No transcripts yet</div>';
+  $('list').querySelectorAll('button.del').forEach((b, n) => {
+    b.addEventListener('click', () => delItem(items[n].id));
+  });
 }
 async function loadList() {
   if (!cfg.token || !cfg.gistId) return;
